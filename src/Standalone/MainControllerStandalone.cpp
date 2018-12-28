@@ -803,14 +803,17 @@ void MainControllerStandalone::updateInputTracksRange()
 
                 /** If global input range is reduced to 2 channels and user previous selected inputs 3+4 the input range need be corrected to avoid a beautiful crash :) */
                 int globalInputs = audioDriver->getInputsCount();
-                if (inputTrackRange.getFirstChannel() >= globalInputs)
+                int globalFirst = audioDriver->getFirstSelectedInput();
+                auto inChannels = inputTrackRange.getChannels();
+                auto inFirstChannel = inputTrackRange.getFirstChannel();
+                if (inFirstChannel+inChannels > globalFirst+globalInputs || inFirstChannel < globalFirst)
                 {
                     if (globalInputs >= inputTrackRange.getChannels())   // we have enough channels?
                     {
                         if (inputTrackRange.isMono())
-                            setInputTrackToMono(trackIndex, 0);
+                            setInputTrackToMono(trackIndex, globalFirst);
                         else
-                            setInputTrackToStereo(trackIndex, 0);
+                            setInputTrackToStereo(trackIndex, globalFirst);
                     }
                     else
                     {

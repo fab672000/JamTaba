@@ -529,7 +529,7 @@ QMenu *LocalTrackViewStandalone::createMonoInputsMenu(QMenu *parent)
             channelName = QString::number(index+1)  + " "+ deviceName;
         QString inputName = channelName + "  (" + deviceName + ")";
         QAction *action = monoInputsMenu->addAction(inputName);
-        action->setData(i);  // using the channel index as action data
+        action->setData(index);  // using the channel index as action data
         action->setIcon(monoInputsMenu->icon());
     }
 
@@ -564,12 +564,13 @@ QMenu *LocalTrackViewStandalone::createStereoInputsMenu(QMenu *parent)
     int globalInputs = audioDriver->getInputsCount();
     QString deviceName(audioDriver->getAudioInputDeviceName(audioDriver->getAudioInputDeviceIndex()));
     for (int i = 0; i < globalInputs; i += 2) {
+        int index = audioDriver->getFirstSelectedInput() + i;
         if (i + 1 < globalInputs) { // we can make a channel pair using (i) and (i+1)?
-            QString firstName = getInputChannelNameOnly(i);
-            QString indexes = QString::number(i+1) + " + " + QString::number(i+2);
+            QString firstName = getInputChannelNameOnly(index);
+            QString indexes = QString::number(index+1) + " + " + QString::number(index+2);
             QString inputName = firstName + " [" + indexes +  "]  (" + deviceName + ")";
             QAction *action = stereoInputsMenu->addAction(inputName);
-            action->setData(i); // use the first input pair index as action data
+            action->setData(index); // use the first input pair index as action data
             action->setIcon(stereoInputsMenu->icon());
         }
     }
@@ -719,14 +720,14 @@ QString LocalTrackViewStandalone::getAudioInputText()
 {
     auto inputRange = inputNode->getAudioInputRange();
     if (inputNode->isStereo()) {
-        int firstInputIndex = inputRange.getFirstChannel() + controller->getAudioDriver()->getFirstSelectedInput();
+        int firstInputIndex = inputRange.getFirstChannel();
         QString indexes = "(" + QString::number(firstInputIndex+1) + "+" + QString::number(firstInputIndex+2) + ") ";
         return indexes + getInputChannelNameOnly(firstInputIndex);
     }
 
     if (inputNode->isMono()) {
         auto audioDriver = controller->getAudioDriver();
-        int index = inputRange.getFirstChannel() + controller->getAudioDriver()->getFirstSelectedInput();
+        int index = inputRange.getFirstChannel();
         QString name = QString(audioDriver->getInputChannelName(index));
         QString inputType = QString(QString::number(index+1) + " - ");
         if (!name.isNull() && !name.isEmpty())

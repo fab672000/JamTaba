@@ -54,11 +54,11 @@ private slots:
     void showDialogToAddVstScanFolder();
     void removeSelectedVstScanFolder();
 
-    void populateLastInputCombo();
-    void populateLastOutputCombo();
-
     void changeAudioInputDevice(int index);
     void changeAudioOutputDevice(int index);
+
+    void onFirstInputComboChanged();
+    void onFirstOutputComboChanged();
 
     void notifySampleRateChanged();
     void notifyBufferSizeChanged();
@@ -80,8 +80,9 @@ private:
     void selectVstPluginsTab();
 
     void populateAsioDriverCombo();
-    void populateFirstInputCombo();
-    void populateFirstOutputCombo();
+
+    void populateInputCombos();
+    void populateOutputCombos();
 
     void populateSampleRateCombo();
     void populateBufferSizeCombo();

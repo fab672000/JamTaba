@@ -23,15 +23,25 @@ PortAudioDriver::PortAudioDriver(controller::MainController *mainController,
         audioInputDeviceIndex = deviceInputIndex;
         audioOutputDeviceIndex = UseSingleAudioIODevice ? deviceInputIndex : deviceOutputIndex;
 
+        int minInputs = getMaxInputs();
+        if (minInputs<1) { // this driver is ouput only or does not exist anymore, so fallback to default device
+            audioInputDeviceIndex = Pa_GetDefaultInputDevice();
+        }
+
+        int maxOutputs = getMaxOutputs();
+        if (maxOutputs<1) { // this driver is input only or does not exist anymore, so fallback to default device
+            audioOutputDeviceIndex = Pa_GetDefaultOutputDevice();
+            maxOutputs = getMaxOutputs();
+        }
+
         globalInputRange = ChannelRange(0, getMaxInputs());
 
         globalOutputRange = ChannelRange(0, 2);// 2 channels for output
 
-        int maxOutputs = getMaxOutputs();
         if (maxOutputs > 1)
             globalOutputRange.setToStereo();
-        if(!initPortAudio(sampleRate, bufferSize)){
-            qCritical() << "ERROR initializing portaudio:" << Pa_GetErrorText(error);
+        if(maxOutputs < 1 || !initPortAudio(sampleRate, bufferSize)) {
+            qCritical() << "ERROR initializing portaudio: " << (error ? Pa_GetErrorText(error) : "no output.");
             audioInputDeviceIndex = audioOutputDeviceIndex = paNoDevice;
         }
     } else {
@@ -57,20 +67,18 @@ QList<int> PortAudioDriver::getValidBufferSizes(int deviceIndex) const
 
 QString PortAudioDriver::getOutputChannelName(const unsigned int index) const
 {
-    PaDeviceIndex device = Pa_GetDefaultOutputDevice();
-    if (device == paNoDevice)
+    if (audioOutputDeviceIndex == paNoDevice)
         return "Error! No Output!";
 
-    return QString(PaMacCore_GetChannelName(device, index, false));
+    return QString(PaMacCore_GetChannelName(audioOutputDeviceIndex, index, false));
 }
 
 QString PortAudioDriver::getInputChannelName(const unsigned int index) const
 {
-    PaDeviceIndex device = Pa_GetDefaultInputDevice();
-    if (device == paNoDevice)
+    if (audioInputDeviceIndex == paNoDevice)
         return "Error! No Input!";
 
-    return QString(PaMacCore_GetChannelName(device, index, true));
+    return QString(PaMacCore_GetChannelName(audioInputDeviceIndex, index, true));
 }
 
 void PortAudioDriver::configureHostSpecificInputParameters(PaStreamParameters &inputParameters)

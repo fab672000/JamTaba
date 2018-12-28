@@ -15,17 +15,13 @@ using audio::PluginDescriptor;
  This file contains the common/shared implementation for the Jamtaba plataforms (Win, Mac and Linux) in Standalone. In the Vst Plugin some details are different and implemented in the file VstPreferencesDialog.cpp.
  */
 
-PreferencesDialogStandalone::PreferencesDialogStandalone(QWidget *parent,
-                                                         bool showAudioControlPanelButton,
-                                                         AudioDriver *audioDriver,
-                                                         MidiDriver *midiDriver) :
+PreferencesDialogStandalone::PreferencesDialogStandalone(QWidget *parent, bool showAudioControlPanelButton, AudioDriver *audioDriver, MidiDriver *midiDriver) :
     PreferencesDialog(parent),
     audioDriver(audioDriver),
     midiDriver(midiDriver),
     showAudioDriverControlPanelButton(showAudioControlPanelButton)
 {
-    if (UseSingleAudioIODevice)
-    {
+    if (UseSingleAudioIODevice) {
         ui->comboAudioOutputDevice->setVisible(false);
         ui->comboAudioOutputDeviceLabel->setVisible(false);
         ui->comboAudioInputDeviceLabel->setVisible(false);
@@ -73,10 +69,10 @@ void PreferencesDialogStandalone::setupSignals()
     connect(ui->comboAudioOutputDevice, SIGNAL(activated(int)), this, SLOT(changeAudioOutputDevice(int)));
 
     connect(ui->comboFirstInput, SIGNAL(currentIndexChanged(int)), this,
-            SLOT(populateLastInputCombo()));
+            SLOT(onFirstInputComboChanged()));
 
     connect(ui->comboFirstOutput, SIGNAL(currentIndexChanged(int)), this,
-            SLOT(populateLastOutputCombo()));
+            SLOT(onFirstOutputComboChanged()));
 
     connect(ui->buttonControlPanel, SIGNAL(clicked(bool)), this,
             SIGNAL(openingExternalAudioControlPanel()));
@@ -256,8 +252,7 @@ void PreferencesDialogStandalone::populateMidiTab()
         }
         QSpacerItem *spacer = new QSpacerItem(10, 10, QSizePolicy::Minimum, QSizePolicy::Expanding);
         ui->midiContentPanel->layout()->addItem(spacer);
-    }
-    else { // no devices detected
+    } else { // no devices detected
         QLabel *label = new QLabel(tr("No midi input device detected!"));
         ui->midiContentPanel->layout()->addWidget(label);
         ui->midiContentPanel->layout()->setAlignment(label, Qt::AlignCenter);
@@ -267,8 +262,8 @@ void PreferencesDialogStandalone::populateMidiTab()
 void PreferencesDialogStandalone::populateAudioTab()
 {
     populateAsioDriverCombo();
-    populateFirstInputCombo();
-    populateFirstOutputCombo();
+    populateInputCombos();
+    populateOutputCombos();
     populateSampleRateCombo();
     populateBufferSizeCombo();
 
@@ -281,21 +276,23 @@ void PreferencesDialogStandalone::populateAsioDriverCombo()
     ui->comboAudioInputDevice->clear();
     ui->comboAudioOutputDevice->clear();
 
-    unsigned nIn=0, nOut=0;
+    unsigned nIn = 0, nOut = 0;
 
     auto currentInputDeviceIndex = audioDriver->getAudioInputDeviceIndex();
     auto currentOutputDeviceIndex = audioDriver->getAudioOutputDeviceIndex();
-    int posIn=0, posOut=0, markIn=0, markOut=0;
+    int posIn = 0, posOut = 0, markIn = 0, markOut = 0;
 
     for (int d = 0; d < devices; d++) {
         auto name = audioDriver->getAudioDeviceInfo(d, nIn, nOut);
-        if (nIn>0) {
+        if (nIn > 0) {
             ui->comboAudioInputDevice->addItem(name, d); // using device index as userData in comboBox
-            if (currentInputDeviceIndex==d) markIn=posIn; else posIn++;
+            if (currentInputDeviceIndex == d) markIn = posIn;
+            else posIn++;
         }
-        if (nOut>0) {
+        if (nOut > 0) {
             ui->comboAudioOutputDevice->addItem(name, d); // using device index as userData in comboBox
-            if (currentOutputDeviceIndex==d) markOut=posOut; else posOut++;
+            if (currentOutputDeviceIndex == d) markOut = posOut;
+            else posOut++;
         }
     }
 
@@ -303,67 +300,72 @@ void PreferencesDialogStandalone::populateAsioDriverCombo()
     ui->comboAudioOutputDevice->setCurrentIndex(markOut);
 }
 
-void PreferencesDialogStandalone::populateFirstInputCombo()
+void PreferencesDialogStandalone::populateInputCombos()
 {
+    disconnect(ui->comboFirstInput, SIGNAL(currentIndexChanged(int)), this, SLOT(onFirstInputComboChanged()));
+
     ui->comboFirstInput->clear();
-    int maxInputs = audioDriver->getMaxInputs();
-    for (int i = 0; i < maxInputs; i++)
-    {
+    ui->comboLastInput->clear();
+
+    auto maxInputs = audioDriver->getMaxInputs();
+    auto firstSelectedInput = audioDriver->getFirstSelectedInput();
+    auto firstInputIndex = std::max(std::min(firstSelectedInput, maxInputs-1), 0);
+    auto lastInputIndex = std::max(maxInputs-1, 0);
+
+    for (int i = 0; i < maxInputs; i++) {
         auto cName = audioDriver->getInputChannelName(i);
+        // some drivers only have a number id and return an empty string, so create a default name instead of blank
+        if (cName.isEmpty())
+            cName = QString("Input %1").arg(i);
         ui->comboFirstInput->addItem(cName, i);
+        ui->comboLastInput->addItem(cName, i);
     }
 
-    int firstInputIndex = audioDriver->getFirstSelectedInput();
-    if (firstInputIndex < maxInputs)
-        ui->comboFirstInput->setCurrentIndex(firstInputIndex);
-    else
-        ui->comboFirstInput->setCurrentIndex(0);
+    ui->comboFirstInput->setCurrentIndex(firstInputIndex);
+    ui->comboLastInput->setCurrentIndex(lastInputIndex);
+
+    connect(ui->comboFirstInput, SIGNAL(currentIndexChanged(int)), this, SLOT(onFirstInputComboChanged()));
 }
 
-void PreferencesDialogStandalone::populateLastInputCombo()
+void PreferencesDialogStandalone::onFirstInputComboChanged()
 {
-    ui->comboLastInput->clear();
     int maxInputs = audioDriver->getMaxInputs();
-    int currentFirstInput = ui->comboFirstInput->currentData().toInt();
-    int items = 0;
-    const int MAX_ITEMS = maxInputs - currentFirstInput;
-    for (int i = currentFirstInput; items < MAX_ITEMS; i++, items++)
-        ui->comboLastInput->addItem(audioDriver->getInputChannelName(i), i);
-
-    int lastInputIndex = audioDriver->getFirstSelectedInput() + MAX_ITEMS - 1;
-    if (lastInputIndex < ui->comboLastInput->count())
-        ui->comboLastInput->setCurrentIndex(lastInputIndex);
-    else
-        ui->comboLastInput->setCurrentIndex(ui->comboLastInput->count()-1);
-
+    int firstInputIndex = ui->comboFirstInput->currentIndex();
+    auto lastInputIndex = std::max(std::min(firstInputIndex+1, maxInputs-1), 0);
+    ui->comboLastInput->setCurrentIndex(lastInputIndex);
 }
 
-void PreferencesDialogStandalone::populateFirstOutputCombo()
+void PreferencesDialogStandalone::populateOutputCombos()
 {
+    disconnect(ui->comboFirstOutput, SIGNAL(currentIndexChanged(int)), this, SLOT(onFirstOutputComboChanged()));
     ui->comboFirstOutput->clear();
-    int maxOuts = audioDriver->getMaxOutputs();
-    for (int i = 0; i < maxOuts; i++)
-        ui->comboFirstOutput->addItem(audioDriver->getOutputChannelName(i), i);
-    ui->comboFirstOutput->setCurrentIndex(audioDriver->getFirstSelectedOutput());
+    ui->comboLastOutput->clear();
+
+    auto firstSelectOutput = audioDriver->getFirstSelectedOutput();
+    auto maxOutputs = audioDriver->getMaxOutputs();
+    auto firstOutputIndex = std::max(std::min(firstSelectOutput, maxOutputs-1), 0);
+    auto lastOutputIndex = std::max(std::min(firstOutputIndex+1, maxOutputs-1), 0);
+
+    for (int i = 0; i < maxOutputs; i++) {
+        auto cName = audioDriver->getOutputChannelName(i);
+        // some drivers only have a number id and return an empty string, so create a default name instead of blank
+        if (cName.isEmpty())
+            cName = QString("Output %1").arg(i);
+        ui->comboFirstOutput->addItem(cName, i);
+        ui->comboLastOutput->addItem(cName, i);
+    }
+
+    ui->comboFirstOutput->setCurrentIndex(firstOutputIndex);
+    ui->comboLastOutput->setCurrentIndex(lastOutputIndex);
+    connect(ui->comboFirstOutput, SIGNAL(currentIndexChanged(int)), this, SLOT(onFirstOutputComboChanged()));
 }
 
-void PreferencesDialogStandalone::populateLastOutputCombo()
+void PreferencesDialogStandalone::onFirstOutputComboChanged()
 {
-    ui->comboLastOutput->clear();
-    int maxOuts = audioDriver->getMaxOutputs();
-    int currentFirstOut = ui->comboFirstOutput->currentData().toInt();
-    if (currentFirstOut + 1 < maxOuts)
-        currentFirstOut++; // to avoid 1 channel output
-
-    int items = 0;
-    const int MAX_ITEMS = 1; // std::min( maxOuts - currentFirstOut, 2);
-    for (int i = currentFirstOut; items < MAX_ITEMS; i++, items++)
-        ui->comboLastOutput->addItem(audioDriver->getOutputChannelName(i), i);
-    int lastOutputIndex = audioDriver->getFirstSelectedOutput() + audioDriver->getOutputsCount();
-    int index = ui->comboLastOutput->findData(lastOutputIndex);
-    ui->comboLastOutput->setCurrentIndex(index >= 0 ? index : 0);
-
-    ui->groupBoxOutputs->setEnabled(audioDriver->getMaxOutputs() > 2);
+    int maxOutputs = audioDriver->getMaxOutputs();
+    int firstOutputIndex = ui->comboFirstOutput->currentIndex();
+    auto lastOutputIndex = std::max(std::min(firstOutputIndex+1, maxOutputs-1), 0);
+    ui->comboLastOutput->setCurrentIndex(lastOutputIndex);
 }
 
 void PreferencesDialogStandalone::populateSampleRateCombo()
@@ -393,27 +395,28 @@ void PreferencesDialogStandalone::changeAudioInputDevice(int index)
 {
     int deviceIndex = ui->comboAudioInputDevice->itemData(index).toInt();
     audioDriver->setAudioInputDeviceIndex(deviceIndex);
-    populateFirstInputCombo();
+
     // On some platforms that don't support well seperate i/o devices yet,
     // we may use only one device selection so auto-update output
-    if  (UseSingleAudioIODevice) {
+    if (UseSingleAudioIODevice) {
         changeAudioOutputDevice(deviceIndex); // also sets buffer and sample size
-    }
-    else {
+    } else {
         populateSampleRateCombo();
         populateBufferSizeCombo();
     }
+
+    populateInputCombos();
 }
 
 void PreferencesDialogStandalone::changeAudioOutputDevice(int index)
 {
-    int deviceIndex = UseSingleAudioIODevice ?
-                ui->comboAudioInputDevice->itemData(index).toInt() :
-                ui->comboAudioOutputDevice->itemData(index).toInt();
+    int deviceIndex = UseSingleAudioIODevice
+                      ? ui->comboAudioInputDevice->itemData(index).toInt()
+                      : ui->comboAudioOutputDevice->itemData(index).toInt();
 
     audioDriver->setAudioOutputDeviceIndex(deviceIndex);
 
-    populateFirstOutputCombo();
+    populateOutputCombos();
     populateSampleRateCombo();
     populateBufferSizeCombo();
 }

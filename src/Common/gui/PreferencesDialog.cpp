@@ -17,7 +17,9 @@ PreferencesDialog::PreferencesDialog(QWidget *parent) :
     setModal(true);
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint & Qt::WA_DeleteOnClose);
 
+#ifdef Q_OS_WIN
     ui->comboLastOutput->setEnabled(false);
+#endif
 
     connect(ui->recordPathLineEdit, &QLineEdit::textEdited, this, &PreferencesDialog::recordingPathSelected);
 
