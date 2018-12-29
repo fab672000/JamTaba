@@ -47,6 +47,7 @@ VST_SDK/
 GeneratedFiles/
 
 # VS Files
+
 **/Release/
 **/Debug/
 *.opensdf
