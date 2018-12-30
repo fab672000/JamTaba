@@ -51,6 +51,7 @@ GeneratedFiles/
 **/Release/
 **/Debug/
 *.opensdf
+**/uic_wrapper.bat
 
 # Xcode files
 
